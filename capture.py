@@ -125,11 +125,12 @@ def _controller_state_to_dict(state: openvr.VRControllerState_t) -> Dict:
     return {"buttons": buttons, "touched": touched, "axes": axes}
 
 
-def poll_frame(vr_system: openvr.IVRSystem) -> Dict:
-    # Grab poses directly from the system so we don't need to be a scene application.
-    poses = vr_system.getDeviceToAbsoluteTrackingPose(
-        openvr.TrackingUniverseStanding, 0, openvr.k_unMaxTrackedDeviceCount
-    )
+def poll_frame(vr_system: openvr.IVRSystem, compositor: openvr.IVRCompositor) -> Dict:
+    # Wait for poses so we sync with compositor; this keeps us independent from any game's loop.
+    render_poses = [openvr.TrackedDevicePose_t() for _ in range(openvr.k_unMaxTrackedDeviceCount)]
+    game_poses = [openvr.TrackedDevicePose_t() for _ in range(openvr.k_unMaxTrackedDeviceCount)]
+    compositor.waitGetPoses(render_poses, game_poses)
+    poses = render_poses
     timestamp = time.time()
     frame: Dict = {"timestamp": timestamp, "devices": []}
 
@@ -192,6 +193,7 @@ def main() -> None:
     signal.signal(signal.SIGINT, _handle_sigint)
 
     openvr.init(openvr.VRApplication_Background)
+    compositor = openvr.VRCompositor()
     vr_system = openvr.VRSystem()
 
     frame_time = 1.0 / args.hz if args.hz > 0 else 0.0
@@ -202,7 +204,7 @@ def main() -> None:
             if end_time and time.time() >= end_time:
                 break
 
-            frame = poll_frame(vr_system)
+            frame = poll_frame(vr_system, compositor)
             fp.write(json.dumps(frame, ensure_ascii=False) + "\n")
             fp.flush()
 
