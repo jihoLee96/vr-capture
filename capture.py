@@ -127,7 +127,10 @@ def _controller_state_to_dict(state: openvr.VRControllerState_t) -> Dict:
 
 def poll_frame(vr_system: openvr.IVRSystem, compositor: openvr.IVRCompositor) -> Dict:
     # Wait for poses so we sync with compositor; this keeps us independent from any game's loop.
-    poses, _ = compositor.waitGetPoses()
+    render_poses = [openvr.TrackedDevicePose_t() for _ in range(openvr.k_unMaxTrackedDeviceCount)]
+    game_poses = [openvr.TrackedDevicePose_t() for _ in range(openvr.k_unMaxTrackedDeviceCount)]
+    compositor.waitGetPoses(render_poses, game_poses)
+    poses = render_poses
     timestamp = time.time()
     frame: Dict = {"timestamp": timestamp, "devices": []}
 
